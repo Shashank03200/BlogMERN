@@ -13,6 +13,8 @@ authRouter.post(
   authController.register
 );
 
+authRouter.get("/verify-user/:token", authController.verifyAccount);
+
 authRouter.post(
   "/login",
   loginValidationRules(),

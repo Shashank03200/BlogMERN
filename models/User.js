@@ -52,6 +52,12 @@ const userSchema = new mongoose.Schema(
       default: [],
       ref: "Post",
     },
+    active: {
+      type: Boolean,
+      default: false,
+    },
+    activeToken: String,
+    activeExpires: Date,
   },
   { timestamps: true }
 );
@@ -70,14 +76,15 @@ userSchema.pre("save", async function (next) {
 });
 
 userSchema.pre("updateOne", async function (next) {
+  const docToUpdate = await this.model.findOne(this.getQuery());
+
   try {
-    const salt = await bcrypt.genSalt(10);
-    console.log("Updating");
-    console.log(this._update.password);
-    const hashedPassword = await bcrypt.hash(this._update.password, salt);
-    this.password = hashedPassword;
-    console.log(hashedPassword);
-    next();
+    if (docToUpdate.password !== this._update.password) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(this._update.password, salt);
+      this._update.password = hashedPassword;
+      next();
+    }
   } catch (err) {
     console.log(err);
   }

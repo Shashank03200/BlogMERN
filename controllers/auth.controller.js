@@ -1,6 +1,9 @@
 const createError = require("http-errors");
 const User = require("../models/User");
 const client = require("../helpers/redis_init");
+const sendEmail = require("../helpers/sendgrid_init");
+const crypto = require("crypto");
+
 const {
   signAccessToken,
   verifyAccessToken,
@@ -11,17 +14,18 @@ const {
 const register = async (req, res, next) => {
   try {
     const newUser = await new User(req.body);
+
+    const token = crypto.randomBytes(20).toString("hex");
+    newUser.activeToken = token;
+    newUser.activeExpires = Date.now() + 10 * 60 * 1000;
     const user = await newUser.save();
-    const accessToken = await signAccessToken(newUser.id);
-    const refreshToken = await signRefreshToken(newUser.id);
-    res.status(200).json({
-      success: true,
-      msg: "Account created",
-      data: {
-        accessToken,
-        refreshToken,
-      },
-    });
+
+    const emailResult = await sendEmail(user.email, token);
+    if (emailResult.success) {
+      res.status(200).json(emailResult);
+    } else {
+      res.status(500).json(emailResult);
+    }
   } catch (err) {
     next(err);
   }
@@ -101,9 +105,40 @@ const logout = async (req, res, next) => {
   }
 };
 
+const verifyAccount = async (req, res, next) => {
+  const activeToken = req.params.token;
+  console.log(activeToken);
+  const foundUser = await User.findOne({
+    activeToken,
+    activeExpires: { $gt: Date.now() },
+  });
+
+  if (!foundUser) {
+    return res.status(404).json({
+      sucess: false,
+      msg: "The activation link is invalid",
+    });
+  }
+  if (foundUser) {
+    foundUser.active = true;
+    foundUser.activeExpires = "";
+    await foundUser.save();
+    const accessToken = await signAccessToken(foundUser.id);
+    const refreshToken = await signRefreshToken(foundUser.id);
+    res.status(200).json({
+      success: true,
+      msg: "Account created",
+      data: {
+        accessToken,
+        refreshToken,
+      },
+    });
+  }
+};
 module.exports = {
   register,
   login,
   logout,
   refreshToken,
+  verifyAccount,
 };
