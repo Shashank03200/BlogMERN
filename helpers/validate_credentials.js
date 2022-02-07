@@ -1,4 +1,5 @@
 const { body, validationResult } = require("express-validator");
+const Post = require("../models/Post");
 const User = require("../models/User");
 
 const registerValidationRules = () => {
@@ -16,8 +17,9 @@ const registerValidationRules = () => {
         });
       }),
     body("username")
-      .isLength({ min: 3 })
       .exists({ checkFalsy: true })
+      .withMessage("Please provide a username")
+      .isLength({ min: 3 })
       .withMessage("The username should be atleast 3 characters long.")
       .custom((value) => {
         return User.findOne({ username: value }).then((foundUser) => {
@@ -44,8 +46,15 @@ const validate = (req, res, next) => {
   }
   const extractedErrors = [];
   errors.array().map((err) => extractedErrors.push({ [err.param]: err.msg }));
+  console.log(extractedErrors);
+  let msg = "";
+  console.log("First error", extractedErrors[0]);
+  console.log("Key", Object.keys(extractedErrors[0]));
+  msg = msg + Object.values(extractedErrors[0])[0];
+
   return res.status(400).json({
-    errors: extractedErrors,
+    success: false,
+    msg,
   });
 };
 
@@ -69,8 +78,33 @@ const loginValidationRules = () => {
   ];
 };
 
+const addCommentValidationRules = () => {
+  return [
+    body("commentText").exists().withMessage("Please provide some text"),
+    body("postId")
+      .exists()
+      .custom((value) => {
+        return Post.findOne({ _id: value }).then((foundPost) => {
+          if (!foundPost) {
+            return Promise.reject("No such post. Bad request");
+          }
+        });
+      }),
+    body("userId")
+      .exists()
+      .custom((value) => {
+        return User.findOne({ _id: value }).then((foundUser) => {
+          if (!foundUser) {
+            return Promise.reject("No such user. Bad request");
+          }
+        });
+      }),
+  ];
+};
+
 module.exports = {
   registerValidationRules,
   loginValidationRules,
+  addCommentValidationRules,
   validate,
 };

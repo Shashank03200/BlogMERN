@@ -52,6 +52,10 @@ const userSchema = new mongoose.Schema(
       default: [],
       ref: "Post",
     },
+    interests: {
+      type: [String],
+      default: [],
+    },
     active: {
       type: Boolean,
       default: false,

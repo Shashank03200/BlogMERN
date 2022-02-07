@@ -13,6 +13,8 @@ authRouter.post(
   authController.register
 );
 
+authRouter.post("/refresh-token", authController.refreshToken);
+
 authRouter.get("/verify-user/:token", authController.verifyAccount);
 
 authRouter.post(

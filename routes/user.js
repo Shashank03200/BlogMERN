@@ -1,27 +1,39 @@
-const { verifyAcessToken } = require("../helpers/auth_jwt");
-const userControlller = require("../controllers/user.contoller");
+const {
+  verifyAccessToken,
+  conditionalVerifyAccess,
+} = require("../helpers/auth_jwt");
+
+const userController = require("../controllers/user.contoller");
 const upload = require("../helpers/multer_upload");
 const userRouter = require("express").Router();
 
 userRouter.get(
   "/allposts/:userId",
-  verifyAcessToken,
-  userControlller.getAllPosts
+  verifyAccessToken,
+  userController.getAllPosts
 );
 
-userRouter.get("/user/:userId", verifyAcessToken, userControlller.getUser);
+userRouter.get("/user", verifyAccessToken, userController.getCurrentUser);
+
+userRouter.get(
+  "/user/:userId",
+  conditionalVerifyAccess,
+  userController.getUser
+);
 
 userRouter.put(
-  "/edit/:userId",
-  verifyAcessToken,
-  upload,
-  userControlller.editUser
+  "/edit-user/:userId",
+  verifyAccessToken,
+  upload.single("profilePicture"),
+  userController.editUser
 );
+
+userRouter.put("/edit-pref", verifyAccessToken, userController.setPreferences);
 
 userRouter.delete(
   "/delete/:userId",
-  verifyAcessToken,
-  userControlller.deleteUser
+  verifyAccessToken,
+  userController.deleteUser
 );
 
 module.exports = userRouter;

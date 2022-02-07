@@ -7,7 +7,7 @@ const signAccessToken = (userId) => {
     const payload = {};
     const secret = process.env.ACCESS_SECRET;
     const options = {
-      expiresIn: "1y",
+      expiresIn: "5s",
       audience: userId,
       issuer: "blogbyshashank.com",
     };
@@ -21,7 +21,7 @@ const signAccessToken = (userId) => {
   });
 };
 
-const verifyAcessToken = (req, res, next) => {
+const verifyAccessToken = (req, res, next) => {
   try {
     const accessString = req.headers["authorization"];
     if (!accessString) {
@@ -70,20 +70,57 @@ const signRefreshToken = (userId) => {
         refreshToken,
         "EX",
         365 * 24 * 60 * 60,
-        (err, result) => {
+        (err, tokenSaved) => {
           if (err) {
             return reject("Data Store Error");
           }
-          console.log(result);
-          return resolve(refreshToken);
+
+          client.expire(userId, 365 * 24 * 60 * 60, (err, result) => {
+            return resolve(refreshToken);
+          });
         }
       );
     });
   });
 };
 
+const conditionalVerifyAccess = (req, res, next) => {
+  try {
+    const accessString = req.headers["authorization"];
+    if (!accessString) {
+      next();
+    }
+    const bearerToken = accessString.split(" ");
+
+    if (!bearerToken) {
+      next();
+    }
+
+    const accessToken = bearerToken[1];
+    if (!accessToken) next();
+
+    jwt.verify(
+      accessToken,
+      process.env.ACCESS_SECRET,
+
+      function (err, result) {
+        if (err) {
+          console.log(err);
+          next();
+        }
+        req.userId = result.aud;
+        next();
+      }
+    );
+  } catch (err) {
+    console.log(err);
+    next();
+  }
+};
+
 const verifyRefreshToken = (refreshToken) => {
   return new Promise((resolve, reject) => {
+    console.log(refreshToken);
     try {
       jwt.verify(
         refreshToken,
@@ -99,22 +136,25 @@ const verifyRefreshToken = (refreshToken) => {
             if (err) {
               throw createError.InternalServerError();
             }
+            console.log({ storedRefreshToken });
+            console.log({ refreshToken });
             if (refreshToken !== storedRefreshToken) {
               throw createError.Unauthorized();
             }
-            return resolve(true);
+            return resolve(userId);
           });
         }
       );
     } catch (err) {
-      next(err);
+      console.log(err);
     }
   });
 };
 
 module.exports = {
   signAccessToken,
-  verifyAcessToken,
+  verifyAccessToken,
   signRefreshToken,
   verifyRefreshToken,
+  conditionalVerifyAccess,
 };

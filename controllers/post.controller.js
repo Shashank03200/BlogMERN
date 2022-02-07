@@ -10,7 +10,7 @@ const createPost = async (req, res, next) => {
     const postFile = req.file;
     console.log(req.file.path);
     const result = await cloudinary.uploader.upload(postFile.path, {
-      folder: "blog",
+      folder: `blog/posts/${userId}`,
     });
 
     const newPost = await new Post({
@@ -37,7 +37,7 @@ const createPost = async (req, res, next) => {
     };
 
     return res.status(200).json({
-      sucess: true,
+      success: true,
       data: completePost,
     });
   } catch (error) {
@@ -67,7 +67,9 @@ const editPost = async (req, res, next) => {
           type: "upload",
           invalidate: true,
         });
-        result = await cloudinary.uploader.upload(req.file.path);
+        result = await cloudinary.uploader.upload(req.file.path, {
+          folder: `blog/posts/${userId}`,
+        });
       }
 
       console.log({ title, desc });
@@ -135,7 +137,7 @@ const deletePost = async (req, res, next) => {
     });
 
     res.status(200).json({
-      sucess: true,
+      success: true,
       msg: "Post deleted",
     });
   } catch (error) {

@@ -4,7 +4,7 @@ sgMail.setApiKey(process.env.API_KEY);
 
 module.exports = (email, token) => {
   console.log(token);
-  var link = `http://localhost:5000/api/auth/verify-user/${token}`;
+  var link = `http://localhost:3000/verify-account/${token}`;
   var emailText =
     '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><a href="' +
     link +
@@ -25,7 +25,7 @@ module.exports = (email, token) => {
     sgMail.send(msgObject).then(
       () => {
         return resolve({
-          sucess: true,
+          success: true,
           msg: "Verification Email Sent",
         });
       },
@@ -36,7 +36,7 @@ module.exports = (email, token) => {
           console.error(error.response.body);
         }
         return reject({
-          sucess: false,
+          success: false,
           msg: "API Server Error",
         });
       }

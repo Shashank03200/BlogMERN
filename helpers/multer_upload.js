@@ -23,6 +23,6 @@ const upload = multer({
   storage: multer.diskStorage({}),
   fileFilter: fileFilter,
   limits: 1024 * 1024,
-}).single("postImage");
+});
 
 module.exports = upload;

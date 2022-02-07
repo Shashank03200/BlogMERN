@@ -11,21 +11,28 @@ const {
   signRefreshToken,
 } = require("../helpers/auth_jwt");
 
+const forwardVerificationEmail = async (newUser, res) => {
+  const token = crypto.randomBytes(20).toString("hex");
+  newUser.activeToken = token;
+  newUser.activeExpires = Date.now() + 10 * 60 * 1000;
+  const user = await newUser.save();
+
+  console.log(user);
+
+  const emailResult = await sendEmail(user.email, token);
+  console.log(emailResult);
+  if (emailResult.success) {
+    res.status(200).json(emailResult);
+  } else {
+    res.status(500).json(emailResult);
+  }
+};
+
 const register = async (req, res, next) => {
   try {
     const newUser = await new User(req.body);
 
-    const token = crypto.randomBytes(20).toString("hex");
-    newUser.activeToken = token;
-    newUser.activeExpires = Date.now() + 10 * 60 * 1000;
-    const user = await newUser.save();
-
-    const emailResult = await sendEmail(user.email, token);
-    if (emailResult.success) {
-      res.status(200).json(emailResult);
-    } else {
-      res.status(500).json(emailResult);
-    }
+    forwardVerificationEmail(newUser, res);
   } catch (err) {
     next(err);
   }
@@ -40,10 +47,17 @@ const login = async (req, res, next) => {
     const reqUser = await User.findOne({ email: email }).select({
       email: 1,
       password: 1,
+      active: 1,
     });
     console.log(reqUser);
     if (reqUser) {
+      if (!reqUser.active) {
+        forwardVerificationEmail(reqUser, res);
+        return;
+      }
+
       const isValid = await reqUser.isValidPassword(password);
+
       if (isValid) {
         const accessToken = await signAccessToken(reqUser.id);
         const refreshToken = await signRefreshToken(reqUser.id);
@@ -54,7 +68,7 @@ const login = async (req, res, next) => {
           data: { accessToken, refreshToken },
         });
       } else {
-        return res.status(200).json({
+        return res.status(401).json({
           success: false,
           msg: "Incorrect Email/Password",
         });
@@ -70,14 +84,19 @@ const login = async (req, res, next) => {
 const refreshToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
+    console.log(refreshToken);
     if (!refreshToken) throw createError.BadRequest();
     const userId = await verifyRefreshToken(refreshToken);
-
+    console.log("Veriifed userId", userId);
     const accessToken = await signAccessToken(userId);
     const newRefreshToken = await signRefreshToken(userId);
     res.status(200).json({
-      accessToken,
-      refreshToken: newRefreshToken,
+      success: true,
+      msg: "Refreshed",
+      data: {
+        accessToken,
+        refreshToken: newRefreshToken,
+      },
     });
   } catch (error) {
     next(error);
@@ -106,35 +125,48 @@ const logout = async (req, res, next) => {
 };
 
 const verifyAccount = async (req, res, next) => {
-  const activeToken = req.params.token;
-  console.log(activeToken);
-  const foundUser = await User.findOne({
-    activeToken,
-    activeExpires: { $gt: Date.now() },
-  });
+  try {
+    const activeToken = req.params.token;
+    console.log(activeToken);
+    const foundUser = await User.findOne({
+      activeToken,
+      activeExpires: { $gt: Date.now() },
+    });
 
-  if (!foundUser) {
-    return res.status(404).json({
-      sucess: false,
-      msg: "The activation link is invalid",
-    });
-  }
-  if (foundUser) {
-    foundUser.active = true;
-    foundUser.activeExpires = "";
-    await foundUser.save();
-    const accessToken = await signAccessToken(foundUser.id);
-    const refreshToken = await signRefreshToken(foundUser.id);
-    res.status(200).json({
-      success: true,
-      msg: "Account created",
-      data: {
-        accessToken,
-        refreshToken,
-      },
-    });
+    if (!foundUser) {
+      return res.status(404).json({
+        success: false,
+        msg: "The activation link is invalid",
+      });
+    }
+    if (foundUser) {
+      foundUser.active = true;
+      foundUser.activeToken = "";
+      foundUser.activeExpires = "";
+      await foundUser.save();
+      const accessToken = await signAccessToken(foundUser.id);
+
+      const refreshToken = await signRefreshToken(foundUser.id);
+      console.log(refreshToken);
+      res.status(200).json({
+        success: true,
+        msg: "Email verified",
+        data: {
+          accessToken,
+          refreshToken,
+        },
+      });
+    }
+  } catch (error) {
+    next(error);
   }
 };
+
+// const verifyToken = async (req, res, next) => {
+//   try {
+//   } catch (error) {}
+// };
+
 module.exports = {
   register,
   login,

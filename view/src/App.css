@@ -1,0 +1,11 @@
+.ProfileAvatarWrapper {
+  position: relative;
+  left: 50%;
+  transform: translate(-50%, -60%);
+}
+
+.profilePostsWrapper {
+  display: grid;
+  column-gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+}

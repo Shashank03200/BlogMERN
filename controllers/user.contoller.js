@@ -1,6 +1,28 @@
 const createError = require("http-errors");
 const User = require("../models/User");
 const Post = require("../models/Post");
+const cloudinary = require("../helpers/cloudinary_init");
+
+const getCurrentUser = async (req, res, next) => {
+  try {
+    const userId = req.userId;
+    console.log(userId);
+    const foundUser = await User.findById(userId);
+    if (!foundUser) {
+      throw createError.NotFound();
+    }
+    res.status(200).json({
+      success: true,
+      msg: "Logged In",
+      data: {
+        ...foundUser._doc,
+        owner: true,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const getUser = async (req, res, next) => {
   try {
@@ -12,7 +34,12 @@ const getUser = async (req, res, next) => {
     }
     res.status(200).json({
       success: true,
-      data: foundUser,
+      data: {
+        ...foundUser._doc,
+        owner:
+          req.userId !== undefined &&
+          req.userId.toString() === userId.toString(),
+      },
     });
   } catch (error) {
     next(error);
@@ -96,13 +123,16 @@ const editUser = async (req, res, next) => {
 
     if (req.file) {
       if (foundUser.userPublicId) {
-        await cloudinary.uploader.destroy(public_id, {
+        console.log("Deleting Image");
+        await cloudinary.uploader.destroy(foundUser.userPublicId, {
           resource_type: "image",
           type: "upload",
           invalidate: true,
         });
       }
-      result = await cloudinary.uploader.upload(req.file.path);
+      result = await cloudinary.uploader.upload(req.file.path, {
+        folder: `blog/profile/${userId}`,
+      });
     }
 
     await User.updateOne(
@@ -126,9 +156,35 @@ const editUser = async (req, res, next) => {
   }
 };
 
+const setPreferences = async (req, res, next) => {
+  try {
+    const userId = req.userId;
+    const { interests } = req.body;
+
+    console.log(typeof interests);
+    interests.forEach(async (interest) => {
+      await User.updateOne(
+        { _id: userId },
+        {
+          $push: { interest: interest },
+        }
+      );
+    });
+
+    return res.status(200).json({
+      success: true,
+      msg: "Preferences updated",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getUser,
+  getCurrentUser,
   editUser,
   getAllPosts,
   deleteUser,
+  setPreferences,
 };
